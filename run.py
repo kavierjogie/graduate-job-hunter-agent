@@ -3,6 +3,7 @@ import logging
 import sys
 from shared.models import UserProfile
 from agents.orchestrator import OrchestratorAgent
+from shared.config import validate_config
 
 # Configure rich console logging
 logging.basicConfig(
@@ -56,6 +57,9 @@ def create_mock_profile() -> UserProfile:
     )
 
 async def main():
+    # 0. Validate Environment Configuration
+    validate_config()
+
     print("=" * 70)
     print("[DEMO] GRADUATE JOB HUNTER MULTI-AGENT SYSTEM - DEMO RUN")
     print("=" * 70)
@@ -98,12 +102,16 @@ async def main():
     
     # CV Tailoring
     print("\n--- TAILORED CV METADATA ---")
-    print(f"  - Estimated Alignment Score: {result['tracker_status'].get('alignment_score', 88.0)}%")
+    cv_meta = result.get("tailored_cv_metadata", {})
+    alignment_score = cv_meta.get("alignment_score", 0.0)
+    key_changes = cv_meta.get("key_changes", [])
+    print(f"  - Estimated Alignment Score: {alignment_score}%")
     print("  - Key Tailoring Adjustments Made:")
-    # We can fetch key changes from CV result. Since CV tailor returned them, let's show them.
-    print("    * Reordered technical skills section to place relevant programming languages first.")
-    print("    * Revised past project descriptions to emphasize database and API design experiences.")
-    print("    * Added summary statement aligning career goals with the target company's mission.")
+    if key_changes:
+        for change in key_changes:
+            print(f"    * {change}")
+    else:
+        print("    * None reported.")
 
     # Cover Letter Preview
     print("\n--- COVER LETTER PREVIEW ---")

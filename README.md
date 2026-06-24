@@ -138,3 +138,35 @@ To verify that all interface contracts and database layers are correct:
 ```bash
 pytest
 ```
+
+---
+
+## 🐳 Docker Deployment
+
+The application is fully containerized, allowing you to run the entire multi-agent pipeline instantly without setting up a local Python environment.
+
+### Prerequisites
+- [Docker](https://docs.docker.com/get-docker/) installed.
+
+### 1. Build the Docker Image
+Run the following command in the project root directory to build the lightweight container image:
+```bash
+docker build -t graduate-job-hunter .
+```
+
+### 2. Run the Container
+You must provide a valid `GEMINI_API_KEY` at runtime. You can do this in two ways:
+
+#### Option A: Load from a `.env` file (Recommended)
+Create a `.env` file in the project root (based on `.env.example`) and pass it using the `--env-file` flag:
+```bash
+docker run --env-file .env graduate-job-hunter
+```
+
+#### Option B: Pass the key directly
+Pass the environment variable directly to the `docker run` command:
+```bash
+docker run -e GEMINI_API_KEY="your_actual_api_key_here" graduate-job-hunter
+```
+
+Both options will automatically trigger the config manager, validate the API key, run the job search, CV tailoring, cover letter drafting, and interview prep agents, and output the dynamic tailored results.

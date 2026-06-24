@@ -1,7 +1,18 @@
 import logging
+from pydantic import BaseModel, Field
+from typing import List
 from agents.base import BaseAgent, AgentRequest, AgentResponse
+from shared.llm_client import generate_structured
 
 logger = logging.getLogger("InterviewAgent")
+
+class InterviewQuestion(BaseModel):
+    question: str = Field(..., description="The interview question.")
+    type: str = Field(..., description="The type of the question, e.g., 'technical', 'behavioral', or 'situational'.")
+    suggested_talking_points: List[str] = Field(..., description="Bulleted suggested talking points or strategies for answering this question.")
+
+class InterviewOutput(BaseModel):
+    questions: List[InterviewQuestion] = Field(..., description="A list of generated practice interview questions.")
 
 class InterviewAgent(BaseAgent):
     """
@@ -39,36 +50,72 @@ class InterviewAgent(BaseAgent):
             )
             
         reasoning_steps.append(f"Analyzing interview profile for '{job_title}' at '{company}'...")
-        reasoning_steps.append("Formulating top technical questions based on job description...")
-        reasoning_steps.append("Formulating top behavioral/situational questions...")
         
-        # Stub questions
-        questions = [
-            {
-                "question": f"Why do you want to work as a {job_title} at {company}?",
-                "type": "behavioral",
-                "suggested_talking_points": [
-                    f"Express enthusiasm for {company}'s products or engineering culture.",
-                    "Connect your graduate studies or internship projects to the role's responsibilities.",
-                    "Highlight how this role matches your long-term career trajectory."
-                ]
-            },
-            {
-                "question": "Can you walk us through a challenging programming project you completed, and how you solved a difficult bug?",
-                "type": "technical",
-                "suggested_talking_points": [
-                    "Use the STAR method (Situation, Task, Action, Result).",
-                    "Explain your reasoning in choosing the technology stack.",
-                    "Clearly describe the technical debugging steps and what you learned."
-                ]
-            }
-        ]
+        prompt = f"""
+You are an expert interview coach.
+Your task is to generate a set of custom practice interview questions and suggested talking points for a candidate interviewing for a role.
+
+Job Title: {job_title}
+Company: {company}
+
+Target Job Description:
+\"\"\"
+{job_description}
+\"\"\"
+
+Instructions:
+1. Generate a diverse mix of both technical and behavioral/situational questions (at least 3-5 questions total).
+2. Each question must be highly relevant and directly grounded in the actual requirements and responsibilities detailed in the job description.
+3. For each question, provide a list of concrete, helpful suggested talking points or strategies the candidate should focus on when answering.
+"""
         
-        reasoning_steps.append("Interview question generation completed successfully.")
+        reasoning_steps.append("Sent interview question generation request to Gemini.")
         
-        return AgentResponse(
-            agent_name=self.name,
-            success=True,
-            output={"questions": questions},
-            reasoning_steps=reasoning_steps
-        )
+        try:
+            # Call the shared structured LLM client
+            structured_response = await generate_structured(
+                prompt=prompt,
+                response_schema=InterviewOutput
+            )
+            
+            reasoning_steps.append("Received and parsed structured interview questions response from Gemini.")
+            reasoning_steps.append("Interview question generation completed successfully.")
+            
+            # Serialize model to output format
+            serialized_questions = [
+                {
+                    "question": q.question,
+                    "type": q.type,
+                    "suggested_talking_points": q.suggested_talking_points
+                }
+                for q in structured_response.questions
+            ]
+            
+            return AgentResponse(
+                agent_name=self.name,
+                success=True,
+                output={"questions": serialized_questions},
+                reasoning_steps=reasoning_steps
+            )
+            
+        except ValueError as e:
+            logger.error(f"Validation or configuration error during interview question generation: {e}", exc_info=True)
+            reasoning_steps.append(f"Configuration or validation error: {str(e)}")
+            return AgentResponse(
+                agent_name=self.name,
+                success=False,
+                output={},
+                reasoning_steps=reasoning_steps,
+                error_message=f"Configuration/Validation error: {str(e)}"
+            )
+        except Exception as e:
+            logger.error(f"Gemini API error during interview question generation: {e}", exc_info=True)
+            reasoning_steps.append(f"Gemini API error occurred: {str(e)}")
+            return AgentResponse(
+                agent_name=self.name,
+                success=False,
+                output={},
+                reasoning_steps=reasoning_steps,
+                error_message=f"Gemini API execution error: {str(e)}"
+            )
+

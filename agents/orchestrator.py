@@ -169,6 +169,7 @@ class OrchestratorAgent:
             "pipeline_log": pipeline_log,
             "target_job": target_job_dict,
             "tailored_cv": tailored_cv_text,
+            "tailored_cv_metadata": cv_res.output,
             "cover_letter": cover_letter_text,
             "interview_questions": interview_questions,
             "tracker_status": track_res.output

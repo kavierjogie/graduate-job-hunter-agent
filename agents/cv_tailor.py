@@ -1,7 +1,15 @@
 import logging
+from pydantic import BaseModel, Field
+from typing import List
 from agents.base import BaseAgent, AgentRequest, AgentResponse
+from shared.llm_client import generate_structured
 
 logger = logging.getLogger("CVTailorAgent")
+
+class CVTailorOutput(BaseModel):
+    tailored_cv_text: str = Field(..., description="The fully tailored CV text, highlighting and reordering experience to align with the job description without fabricating any information.")
+    alignment_score: float = Field(..., description="An estimated alignment score between the candidate's CV and the job description, on a scale of 0.0 to 100.0.")
+    key_changes: List[str] = Field(..., description="A short list of concrete, specific adjustments made to reorder/reframe/rephrase the CV content.")
 
 class CVTailorAgent(BaseAgent):
     """
@@ -48,29 +56,70 @@ class CVTailorAgent(BaseAgent):
             )
             
         reasoning_steps.append("Successfully retrieved base CV and target job description.")
-        reasoning_steps.append("Analyzing job description for key requirements...")
-        reasoning_steps.append("Drafting customized bullet points and emphasizing matched skills...")
         
-        # Stub logic for tailoring:
-        # In a real implementation, this would invoke Gemini with a structured prompt, 
-        # comparing experiences and outputting the tailored text and metadata.
-        tailored_cv = f"{base_cv_text}\n\n[TAILORED ADJUSTMENT] Highlighted skills matching: {job_description[:50]}..."
-        alignment_score = 88.0
-        key_changes = [
-            "Reordered technical skills section to place relevant programming languages first.",
-            "Revised past project descriptions to emphasize database and API design experiences.",
-            "Added summary statement aligning career goals with the target company's mission."
-        ]
+        prompt = f"""
+You are an expert CV tailoring assistant.
+Your task is to tailor the candidate's base CV to align with the target job description.
+
+Candidate Base CV:
+\"\"\"
+{base_cv_text}
+\"\"\"
+
+Target Job Description:
+\"\"\"
+{job_description}
+\"\"\"
+
+Instructions:
+1. Rewrite and reorder the CV content to emphasize experience and skills relevant to the job description.
+2. Maintain a professional, clean tone.
+3. CRITICAL: Do NOT fabricate any experience, qualifications, projects, or skills that the candidate does not have. Only reorder, reframe, or rephrase the existing content to highlight matching elements.
+4. Estimate an alignment score (0.0 to 100.0) reflecting how well the tailored CV matches the job requirements.
+5. Provide a short list of concrete, specific changes/adjustments made.
+"""
         
-        reasoning_steps.append(f"CV tailoring completed. Alignment score estimated at {alignment_score}%.")
+        reasoning_steps.append("Sent CV tailoring request to Gemini.")
         
-        return AgentResponse(
-            agent_name=self.name,
-            success=True,
-            output={
-                "tailored_cv_text": tailored_cv,
-                "alignment_score": alignment_score,
-                "key_changes": key_changes
-            },
-            reasoning_steps=reasoning_steps
-        )
+        try:
+            # Call the shared structured LLM client
+            structured_response = await generate_structured(
+                prompt=prompt,
+                response_schema=CVTailorOutput
+            )
+            
+            reasoning_steps.append("Received and parsed structured CV tailoring response from Gemini.")
+            reasoning_steps.append(f"CV tailoring completed. Alignment score estimated at {structured_response.alignment_score}%.")
+            
+            return AgentResponse(
+                agent_name=self.name,
+                success=True,
+                output={
+                    "tailored_cv_text": structured_response.tailored_cv_text,
+                    "alignment_score": structured_response.alignment_score,
+                    "key_changes": structured_response.key_changes
+                },
+                reasoning_steps=reasoning_steps
+            )
+            
+        except ValueError as e:
+            logger.error(f"Validation or configuration error during CV tailoring: {e}", exc_info=True)
+            reasoning_steps.append(f"Configuration or validation error: {str(e)}")
+            return AgentResponse(
+                agent_name=self.name,
+                success=False,
+                output={},
+                reasoning_steps=reasoning_steps,
+                error_message=f"Configuration/Validation error: {str(e)}"
+            )
+        except Exception as e:
+            logger.error(f"Gemini API error during CV tailoring: {e}", exc_info=True)
+            reasoning_steps.append(f"Gemini API error occurred: {str(e)}")
+            return AgentResponse(
+                agent_name=self.name,
+                success=False,
+                output={},
+                reasoning_steps=reasoning_steps,
+                error_message=f"Gemini API execution error: {str(e)}"
+            )
+
