@@ -1,0 +1,35 @@
+[
+  {
+    "job_id": "grad_001",
+    "title": "Graduate Software Engineer (Python & Cloud)",
+    "company": "NextGen Technologies",
+    "description": "Our 2-year rotational graduate scheme offers deep dives into backend engineering, cloud platforms, and DevOps. You will work primarily with Python, Docker, and AWS. We offer mentorship, competitive salary, and hybrid working.",
+    "location": "London, UK",
+    "url": "https://nextgen.example.com/careers/grad_001",
+    "salary_range": "£45,000",
+    "date_posted": "2026-06-24",
+    "requirements": ["Python", "Basic SQL", "Problem Solving", "Computer Science Degree or equivalent"]
+  },
+  {
+    "job_id": "grad_002",
+    "title": "Data Science & AI Intern",
+    "company": "Antigravity Research",
+    "description": "Looking for a summer intern to help our research team evaluate agentic LLM architectures. You will assist in cleaning data, running evaluations, and writing prompt workflows. Strong Python and pandas skills are essential.",
+    "location": "Remote",
+    "url": "https://antigravity.example.com/internships/grad_002",
+    "salary_range": "£3,500/month",
+    "date_posted": "2026-06-23",
+    "requirements": ["Python", "Pandas/NumPy", "Basic Machine Learning", "Good communication"]
+  },
+  {
+    "job_id": "grad_003",
+    "title": "Associate Product Manager - Graduate Program",
+    "company": "FinanceFlow Solutions",
+    "description": "Join our fast-paced product team helping to shape the future of fintech. As an APM, you will run customer interviews, define product specs, and collaborate with engineering. No deep coding required, but a strong technical mindset is a must.",
+    "location": "Manchester, UK",
+    "url": "https://financeflow.example.com/graduates/grad_003",
+    "salary_range": "£42,000",
+    "date_posted": "2026-06-22",
+    "requirements": ["Agile", "User Research", "Analytical Mindset", "Strong presentation skills"]
+  }
+]
