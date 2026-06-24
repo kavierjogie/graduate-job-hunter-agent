@@ -43,7 +43,7 @@ graph TD
     subgraph External Integrations (MCP Seam)
         JobAgent <--> MCPClient[MCP Client Wrapper]
         MCPClient <-->|MCP Protocol| MCPServer[Job Search MCP Server]
-        MCPServer <-->|Local DB / API| JobAPIs[Mock Graduate Jobs DB]
+        MCPServer <-->|Adzuna API| JobAPIs[Adzuna API]
     end
 
     classDef orchestrator fill:#4f46e5,stroke:#312e81,stroke-width:2px,color:#fff;
@@ -78,8 +78,8 @@ graduate-job-hunter-agent/
 │   └── tracker.py            # SQLite Application Tracker Agent
 │
 ├── mcp_server/               # Job Search MCP Server
-│   ├── server.py             # FastMCP / MCP Server definition
-│   └── jobs_db.json          # Mock graduate job listings database
+│   ├── server.py             # FastMCP / MCP Server definition (Adzuna API integration)
+│   └── jobs_db.json          # Mock graduate job listings database (deprecated, to be removed)
 │
 ├── shared/                   # Shared schemas, utilities, and client wrappers
 │   ├── models.py             # Shared Pydantic models (User, Job, CV, Application)
