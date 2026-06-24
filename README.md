@@ -127,8 +127,17 @@ To run the mock execution pipeline showing the orchestrator routing request to s
 python run.py
 ```
 
+### Running the Web Interface
+To run the interactive Streamlit web application:
+```bash
+streamlit run app_streamlit.py
+```
+> [!NOTE]
+> A valid `GEMINI_API_KEY` must be set in your `.env` file first before running the web interface.
+
 ### Running the MCP Server
 To run the Job Search MCP Server standalone:
+
 ```bash
 python mcp_server/server.py
 ```

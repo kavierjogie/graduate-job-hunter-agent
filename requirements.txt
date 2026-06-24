@@ -16,3 +16,7 @@ pytest-asyncio>=0.23.0
 
 # Environment configuration
 python-dotenv>=1.0.0
+
+# Web Interface
+streamlit>=1.30.0
+
