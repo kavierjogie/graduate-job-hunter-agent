@@ -173,6 +173,115 @@ def get_job_details(job_id: str) -> Optional[Dict[str, Any]]:
         logger.warning(f"Job ID '{job_id}' not found in cache. Adzuna does not support direct lookup.")
     return job
 
+@mcp.resource("cv://base")
+async def get_base_cv() -> str:
+    """
+    Retrieve the candidate's base CV text from the local SQLite database.
+    """
+    from shared.storage import DatabaseManager
+    logger.info("MCP Resource cv://base requested")
+    db_path = str(PROJECT_ROOT / "job_hunter.db")
+    db = DatabaseManager(db_path=db_path)
+    try:
+        profile = await db.get_user_profile()
+        if profile and profile.base_cv_text:
+            return profile.base_cv_text
+        return "No base CV available. Please create a candidate profile first."
+    except Exception as e:
+        logger.error(f"Error retrieving base CV from database: {e}")
+        return f"Error retrieving base CV: {str(e)}"
+
+@mcp.resource("tracker://applications")
+async def get_tracked_applications() -> str:
+    """
+    Retrieve the list of job applications tracked in the SQLite database as a formatted JSON string.
+    """
+    from shared.storage import DatabaseManager
+    import json
+    from datetime import datetime
+    logger.info("MCP Resource tracker://applications requested")
+    db_path = str(PROJECT_ROOT / "job_hunter.db")
+    db = DatabaseManager(db_path=db_path)
+    try:
+        apps = await db.list_applications()
+        apps_data = []
+        for app in apps:
+            app_dict = app.model_dump()
+            if isinstance(app_dict.get("last_updated"), datetime):
+                app_dict["last_updated"] = app_dict["last_updated"].isoformat()
+            apps_data.append(app_dict)
+        return json.dumps(apps_data, indent=2)
+    except Exception as e:
+        logger.error(f"Error listing applications from database: {e}")
+        return json.dumps({"error": f"Error listing applications: {str(e)}"})
+
+@mcp.prompt()
+def tailor_cv(base_cv: str, job_description: str) -> str:
+    """
+    Generate a prompt to tailor a candidate's base CV to a target job description.
+    
+    Args:
+        base_cv: The candidate's raw base CV text.
+        job_description: The target job description.
+    """
+    return f"""You are an expert CV tailoring assistant.
+Your task is to tailor the candidate's base CV to align with the target job description.
+
+Candidate Base CV:
+\"\"\"
+{base_cv}
+\"\"\"
+
+Target Job Description:
+\"\"\"
+{job_description}
+\"\"\"
+
+Instructions:
+1. Rewrite and reorder the CV content to emphasize experience and skills relevant to the job description.
+2. Maintain a professional, clean tone.
+3. CRITICAL: Do NOT fabricate any experience, qualifications, projects, or skills that the candidate does not have. Only reorder, reframe, or rephrase the existing content to highlight matching elements.
+4. Estimate an alignment score (0.0 to 100.0) reflecting how well the tailored CV matches the job requirements.
+5. Provide a short list of concrete, specific changes/adjustments made.
+"""
+
+@mcp.prompt()
+def draft_cover_letter(job_title: str, company: str, job_description: str, cv_text: str, tone: str = "professional and enthusiastic") -> str:
+    """
+    Generate a prompt to draft a highly personalized cover letter.
+    
+    Args:
+        job_title: The title of the job.
+        company: The name of the hiring company.
+        job_description: The job description details.
+        cv_text: The candidate's CV or experience details.
+        tone: The target tone for the letter.
+    """
+    return f"""You are an expert career advisor.
+Your task is to draft a complete, professional cover letter for the candidate applying to the target job at the specified company.
+
+Job Title: {job_title}
+Company: {company}
+Tone: {tone}
+
+Candidate CV:
+\"\"\"
+{cv_text}
+\"\"\"
+
+Target Job Description:
+\"\"\"
+{job_description}
+\"\"\"
+
+Instructions:
+1. Write a complete, professional cover letter addressing the hiring team at {company} for the {job_title} position.
+2. Ground the letter ONLY in the CV content provided. Do NOT invent achievements, projects, or background that are not in the CV.
+3. Tailor the narrative to highlight how the candidate's actual experiences (from their CV) make them a strong fit for the job requirements.
+4. Maintain the requested tone: {tone}.
+5. Provide a list of the key highlights/experiences you emphasized in the cover letter.
+"""
+
 if __name__ == "__main__":
     # Start the FastMCP stdio server
     mcp.run()

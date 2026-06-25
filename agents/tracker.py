@@ -15,7 +15,8 @@ class TrackerAgent(BaseAgent):
     def __init__(self, db_manager: Optional[DatabaseManager] = None):
         super().__init__(
             name="Tracker Agent",
-            description="Manages job application status records in the local SQLite database."
+            description="Manages job application status records in the local SQLite database.",
+            system_instructions="You are a database tracking agent. You log, update, and list candidate application states in the local SQLite datastore."
         )
         self.db = db_manager or DatabaseManager()
 

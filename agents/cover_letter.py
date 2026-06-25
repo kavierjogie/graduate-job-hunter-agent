@@ -17,9 +17,16 @@ class CoverLetterAgent(BaseAgent):
     by marrying a candidate's background/CV with a specific job listing's requirements.
     """
     def __init__(self):
+        system_instructions = (
+            "You are an expert career advisor and professional writer. Your task is to draft "
+            "a complete, persuasive cover letter for a candidate applying to a target job, "
+            "grounding the letter strictly in the provided CV content."
+        )
         super().__init__(
             name="Cover Letter Agent",
-            description="Drafts customized cover letters using CV details and job specifications."
+            description="Drafts customized cover letters using CV details and job specifications.",
+            system_instructions=system_instructions,
+            response_schema=CoverLetterOutput
         )
 
     async def execute(self, request: AgentRequest) -> AgentResponse:
@@ -65,7 +72,42 @@ class CoverLetterAgent(BaseAgent):
             
         reasoning_steps.append(f"Creating a cover letter request for '{job_title}' at '{company}' using {tone} tone.")
         
-        prompt = f"""
+        # Attempt to load prompt dynamically from MCP server
+        from shared.mcp_client import JobSearchMCPClient
+        mcp_client = JobSearchMCPClient()
+        prompt = None
+        try:
+            connected = await mcp_client.connect()
+            if connected:
+                reasoning_steps.append("Connected to MCP server to fetch prompt template.")
+                prompt = await mcp_client.get_prompt(
+                    name="draft_cover_letter",
+                    arguments={
+                        "job_title": job_title,
+                        "company": company,
+                        "job_description": job_description,
+                        "cv_text": cv_text,
+                        "tone": tone
+                    }
+                )
+                await mcp_client.close()
+                if prompt:
+                    reasoning_steps.append("Successfully loaded cover letter prompt dynamically from MCP server.")
+                else:
+                    reasoning_steps.append("MCP server returned empty prompt. Falling back to default.")
+            else:
+                reasoning_steps.append("Could not connect to MCP server. Falling back to default prompt.")
+        except Exception as mcp_err:
+            logger.warning(f"Failed to fetch prompt from MCP server: {mcp_err}. Falling back to default.")
+            reasoning_steps.append(f"Error fetching prompt from MCP server: {str(mcp_err)}. Using fallback.")
+            try:
+                await mcp_client.close()
+            except Exception:
+                pass
+
+        if not prompt:
+            reasoning_steps.append("Using default hardcoded cover letter prompt.")
+            prompt = f"""
 You are an expert career advisor.
 Your task is to draft a complete, professional cover letter for the candidate applying to the target job at the specified company.
 
@@ -94,10 +136,11 @@ Instructions:
         reasoning_steps.append("Sent cover letter drafting request to Gemini.")
         
         try:
-            # Call the shared structured LLM client
-            structured_response = await generate_structured(
+            # Call the native Antigravity Agent structured chat helper
+            user_profile = request.context.get("user_profile", {})
+            structured_response = await self.chat_structured(
                 prompt=prompt,
-                response_schema=CoverLetterOutput
+                user_profile=user_profile
             )
             
             reasoning_steps.append("Received and parsed structured cover letter response from Gemini.")

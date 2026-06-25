@@ -15,7 +15,9 @@ dependencies = [
     "litellm>=1.30.0",
     "aiosqlite>=0.20.0",
     "mcp>=1.0.0",
-    "fastmcp>=0.4.0"
+    "fastmcp>=0.4.0",
+    "streamlit>=1.30.0",
+    "google-antigravity>=0.1.5"
 ]
 
 [tool.pytest.ini_options]

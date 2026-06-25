@@ -17,9 +17,16 @@ class CVTailorAgent(BaseAgent):
     a specific job description. Highlights key skills and relevant projects.
     """
     def __init__(self):
+        system_instructions = (
+            "You are an expert CV tailoring assistant. Your task is to rewrite and reorder "
+            "candidate CV content to emphasize experience and skills relevant to the target "
+            "job description, estimating an alignment score and listing adjustments made."
+        )
         super().__init__(
             name="CV Tailoring Agent",
-            description="Tailors a candidate's CV/resume to match a target job description."
+            description="Tailors a candidate's CV/resume to match a target job description.",
+            system_instructions=system_instructions,
+            response_schema=CVTailorOutput
         )
 
     async def execute(self, request: AgentRequest) -> AgentResponse:
@@ -57,7 +64,36 @@ class CVTailorAgent(BaseAgent):
             
         reasoning_steps.append("Successfully retrieved base CV and target job description.")
         
-        prompt = f"""
+        # Attempt to load prompt dynamically from MCP server
+        from shared.mcp_client import JobSearchMCPClient
+        mcp_client = JobSearchMCPClient()
+        prompt = None
+        try:
+            connected = await mcp_client.connect()
+            if connected:
+                reasoning_steps.append("Connected to MCP server to fetch prompt template.")
+                prompt = await mcp_client.get_prompt(
+                    name="tailor_cv",
+                    arguments={"base_cv": base_cv_text, "job_description": job_description}
+                )
+                await mcp_client.close()
+                if prompt:
+                    reasoning_steps.append("Successfully loaded CV tailoring prompt dynamically from MCP server.")
+                else:
+                    reasoning_steps.append("MCP server returned empty prompt. Falling back to default.")
+            else:
+                reasoning_steps.append("Could not connect to MCP server. Falling back to default prompt.")
+        except Exception as mcp_err:
+            logger.warning(f"Failed to fetch prompt from MCP server: {mcp_err}. Falling back to default.")
+            reasoning_steps.append(f"Error fetching prompt from MCP server: {str(mcp_err)}. Using fallback.")
+            try:
+                await mcp_client.close()
+            except Exception:
+                pass
+
+        if not prompt:
+            reasoning_steps.append("Using default hardcoded CV tailoring prompt.")
+            prompt = f"""
 You are an expert CV tailoring assistant.
 Your task is to tailor the candidate's base CV to align with the target job description.
 
@@ -82,10 +118,11 @@ Instructions:
         reasoning_steps.append("Sent CV tailoring request to Gemini.")
         
         try:
-            # Call the shared structured LLM client
-            structured_response = await generate_structured(
+            # Call the native Antigravity Agent structured chat helper
+            user_profile = request.context.get("user_profile", {})
+            structured_response = await self.chat_structured(
                 prompt=prompt,
-                response_schema=CVTailorOutput
+                user_profile=user_profile
             )
             
             reasoning_steps.append("Received and parsed structured CV tailoring response from Gemini.")

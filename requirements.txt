@@ -20,3 +20,5 @@ python-dotenv>=1.0.0
 # Web Interface
 streamlit>=1.30.0
 
+# Antigravity SDK
+google-antigravity>=0.1.5

@@ -20,9 +20,16 @@ class InterviewAgent(BaseAgent):
     technical, and situational interview questions, along with bulleted talking points.
     """
     def __init__(self):
+        system_instructions = (
+            "You are an expert interview coach. Your task is to analyze a target job description "
+            "and generate a set of customized practice interview questions (technical, behavioral, "
+            "or situational) along with suggested talking points."
+        )
         super().__init__(
             name="Interview Agent",
-            description="Generates custom practice interview questions and talking points for a role."
+            description="Generates custom practice interview questions and talking points for a role.",
+            system_instructions=system_instructions,
+            response_schema=InterviewOutput
         )
 
     async def execute(self, request: AgentRequest) -> AgentResponse:
@@ -72,10 +79,9 @@ Instructions:
         reasoning_steps.append("Sent interview question generation request to Gemini.")
         
         try:
-            # Call the shared structured LLM client
-            structured_response = await generate_structured(
-                prompt=prompt,
-                response_schema=InterviewOutput
+            # Call the native Antigravity Agent structured chat helper
+            structured_response = await self.chat_structured(
+                prompt=prompt
             )
             
             reasoning_steps.append("Received and parsed structured interview questions response from Gemini.")

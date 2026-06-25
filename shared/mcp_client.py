@@ -112,6 +112,50 @@ class JobSearchMCPClient:
             logger.error(f"Error querying MCP tool 'search_jobs': {e}", exc_info=True)
             return []
 
+    async def read_resource(self, uri: str) -> Optional[str]:
+        """
+        Reads a resource from the MCP server by its URI.
+        """
+        logger.info(f"Reading MCP resource: {uri}")
+        if not self.client_session:
+            logger.error("No active MCP session. Did you call connect()?")
+            return None
+        try:
+            result = await self.client_session.read_resource(uri)
+            for content in result.contents:
+                if hasattr(content, "text") and content.text:
+                    return content.text
+                elif isinstance(content, dict) and "text" in content:
+                    return content["text"]
+            return None
+        except Exception as e:
+            logger.error(f"Error reading MCP resource '{uri}': {e}", exc_info=True)
+            return None
+
+    async def get_prompt(self, name: str, arguments: Optional[Dict[str, Any]] = None) -> Optional[str]:
+        """
+        Retrieves a prompt template from the MCP server.
+        """
+        logger.info(f"Retrieving MCP prompt '{name}' with arguments: {arguments}")
+        if not self.client_session:
+            logger.error("No active MCP session. Did you call connect()?")
+            return None
+        try:
+            result = await self.client_session.get_prompt(name=name, arguments=arguments or {})
+            prompt_texts = []
+            for message in result.messages:
+                content = message.content
+                if hasattr(content, "text") and content.text:
+                    prompt_texts.append(content.text)
+                elif isinstance(content, dict) and "text" in content:
+                    prompt_texts.append(content["text"])
+                elif hasattr(content, "value") and content.value:
+                    prompt_texts.append(content.value)
+            return "\n\n".join(prompt_texts) if prompt_texts else None
+        except Exception as e:
+            logger.error(f"Error retrieving MCP prompt '{name}': {e}", exc_info=True)
+            return None
+
     async def close(self) -> None:
         """
         Closes the connection session and cleans up transport resources.

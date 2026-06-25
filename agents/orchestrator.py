@@ -1,5 +1,7 @@
 import logging
 from typing import Dict, Any, List, Optional
+import os
+from google.antigravity import Agent, LocalAgentConfig
 from agents.base import AgentRequest, AgentResponse
 from agents.job_search import JobSearchAgent
 from agents.cv_tailor import CVTailorAgent
@@ -10,7 +12,7 @@ from shared.models import UserProfile, ApplicationState
 
 logger = logging.getLogger("OrchestratorAgent")
 
-class OrchestratorAgent:
+class OrchestratorAgent(Agent):
     """
     Main coordinator of the multi-agent system.
     Maintains user session profile state, routes user intents to appropriate
@@ -23,6 +25,18 @@ class OrchestratorAgent:
         self.cover_letter_agent = CoverLetterAgent()
         self.interview_agent = InterviewAgent()
         self.tracker_agent = TrackerAgent()
+        
+        # Load API key and config
+        from shared.config import GEMINI_API_KEY
+        api_key = GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY")
+        model_name = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
+        
+        config = LocalAgentConfig(
+            system_instructions="You are the Orchestrator Agent coordinating the graduate job search.",
+            api_key=api_key,
+            model=model_name
+        )
+        super().__init__(config)
         
         # In-memory session state (in a real system, synced to SQLite/Redis)
         self.user_profile: Optional[UserProfile] = None
@@ -42,6 +56,22 @@ class OrchestratorAgent:
         """
         Routes a single user intent to the corresponding specialist agent.
         """
+        # Run input guardrail check on all string values in the payload
+        try:
+            from shared.security import check_guardrails
+            for key, value in payload.items():
+                if isinstance(value, str):
+                    check_guardrails(value)
+        except ValueError as e:
+            logger.warning(f"Security Alert: Guardrail blocked route_request: {e}")
+            return AgentResponse(
+                agent_name="Orchestrator",
+                success=False,
+                output={},
+                reasoning_steps=["Security scan of input payload failed."],
+                error_message="Security Block: Potential prompt injection detected."
+            )
+
         request = AgentRequest(
             session_id=self.session_id,
             payload=payload,
@@ -79,6 +109,20 @@ class OrchestratorAgent:
         5. Generate tailored interview questions via the Interview Agent.
         6. Record the application as 'applied' via the Tracker Agent.
         """
+        # Run input guardrail check on search parameters
+        try:
+            from shared.security import check_guardrails
+            check_guardrails(search_query)
+            if location:
+                check_guardrails(location)
+        except ValueError as e:
+            logger.warning(f"Security Alert: Guardrail blocked run_autopilot_pipeline: {e}")
+            return {
+                "success": False,
+                "pipeline_log": ["Security scan of input parameters failed. Pipeline aborted."],
+                "error": "Security Block: Potential prompt injection detected."
+            }
+
         pipeline_log = ["Starting Autopilot Pipeline."]
         
         if not self.user_profile:
